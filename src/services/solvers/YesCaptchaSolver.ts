@@ -103,9 +103,27 @@ export class YesCaptchaSolver implements CaptchaSolver {
             websiteURL: siteurl,
         });
 
+        // --- XỬ LÝ LỖI THÔNG MINH (SMART RETRY) ---
         if (createTaskData.errorId !== 0) {
+            const errDesc = createTaskData.errorDescription || "";
+            
+            // Kiểm tra lỗi bị chặn 5 phút (tiếng Trung hoặc tiếng Anh)
+            if (errDesc.includes("过多错误请求") || errDesc.includes("excessive erroneous requests")) {
+                console.warn(`\n[YesCaptcha] ⚠️ Bị chặn tạm thời (Rate Limit). Đang ngủ 5 phút 10 giây để mở khóa...`);
+                
+                // Chờ 310 giây (5 phút + 10s dự phòng)
+                await delay(310 * 1000);
+                
+                console.log(`[YesCaptcha] ♻️ Hết thời gian chờ, đang tự động thử lại...`);
+                
+                // Gọi lại chính hàm này (Đệ quy) để thử lại
+                return this.solveHcaptcha(sitekey, siteurl);
+            }
+
+            // Nếu là lỗi khác thì throw như bình thường
             throw new Error(`[YesCaptcha] HCaptcha task creation failed: ${createTaskData.errorDescription}`);
         }
+        // ------------------------------------------
 
         const resultData = await this.pollTaskResult(createTaskData.taskId);
 
